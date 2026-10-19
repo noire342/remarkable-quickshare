@@ -40,6 +40,7 @@ jobs:
     permissions:
       contents: write
     steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: release-bundle
@@ -51,7 +52,8 @@ jobs:
           RELEASE_VERSION: ${{ inputs.version || github.ref_name }}
         run: |
           if gh release view "$RELEASE_VERSION" >/dev/null 2>&1; then
-            echo 'Release already exists; refusing to replace published assets.' >&2
-            exit 1
+            gh release download "$RELEASE_VERSION" --dir published --pattern remarkable-quickshare-linux-armv7.tar.gz --pattern SHA256SUMS --pattern install.ps1 --pattern install.sh
+            python scripts/verify_published_release.py release published
+            exit 0
           fi
           gh release create "$RELEASE_VERSION" release/* --verify-tag --title "reMarkable Quick Share $RELEASE_VERSION" --notes 'Receiver and easy SSH installers for reMarkable 2, validated firmware 3.27.3.0 only. PDF/EPUB native import, persistent queue, rollback and uninstall. MIT project code with third-party notices included. No reMarkable firmware binary is distributed. Automatic acceptance requires a trusted Wi-Fi network; the tablet must be awake.'

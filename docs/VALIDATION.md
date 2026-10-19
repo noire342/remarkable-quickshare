@@ -27,8 +27,11 @@ The publication build was additionally checked on **19 October 2026**:
   rollback after failed startup, rejection before service changes, bundle integrity/notices,
   and UI startup with an absent default setting, a corrupt copy or a configuration write failure.
 - Windows PowerShell 5.1 preserved the complete binary byte range and the exact
-  remote shell argument through a fake SSH executable. The actual tablet installation
-  used an authenticated SSH stream; the interactive Windows password prompt was not automated.
+  remote shell argument through a fake SSH executable. A complete Windows installation
+  then passed with the real OpenSSH client, host-key verification and interactive password
+  authentication. This used the local release assets; public download is a separate check.
+- Four release-verification tests check that existing published assets can be verified
+  without replacing them, while rejecting a different executable, source commit or checksum.
 
 The publication build also upgrades the inherited DNS/crypto/network dependencies.
 Source tests, CI, transport tests and physical-device evidence are distinct checks.
