@@ -1,0 +1,36 @@
+[Unit]
+Description=Quick Share receiver and native Xochitl PDF/EPUB importer
+After=home.mount network.target xochitl.service
+Wants=xochitl.service
+RequiresMountsFor=/home/root/quickshare
+StartLimitIntervalSec=300
+StartLimitBurst=10
+
+[Service]
+Type=simple
+WorkingDirectory=/home/root/quickshare
+ExecStart=/home/root/quickshare/bin/kindshare -daemon -iface wlan0 -devicetype 3 -identity /home/root/quickshare/identity -dest /home/root/quickshare/inbox -import-url http://10.11.99.1 -announce 60s
+Restart=on-failure
+RestartSec=5
+UMask=0077
+Environment=GOMEMLIMIT=48MiB
+Environment=GOMAXPROCS=2
+Nice=10
+NoNewPrivileges=yes
+CapabilityBoundingSet=
+ProtectSystem=strict
+ReadWritePaths=/home/root/quickshare /tmp
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+MemoryMax=96M
+TasksMax=32
+StandardOutput=journal
+StandardError=journal
+LogRateLimitIntervalSec=30s
+LogRateLimitBurst=100
+
+[Install]
+WantedBy=multi-user.target

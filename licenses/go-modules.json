@@ -1,0 +1,135 @@
+[
+  {
+    "module": "github.com/cenkalti/backoff",
+    "version": "v2.2.1+incompatible",
+    "license": "MIT",
+    "notices": [
+      "licenses/go-modules/github.com_cenkalti_backoff/LICENSE"
+    ]
+  },
+  {
+    "module": "github.com/golang/protobuf",
+    "version": "v1.5.0",
+    "license": "BSD-3-Clause",
+    "notices": [
+      "licenses/go-modules/github.com_golang_protobuf/LICENSE"
+    ]
+  },
+  {
+    "module": "github.com/google/go-cmp",
+    "version": "v0.7.0",
+    "license": "BSD-3-Clause",
+    "notices": [
+      "licenses/go-modules/github.com_google_go-cmp/LICENSE"
+    ]
+  },
+  {
+    "module": "github.com/grandcat/zeroconf",
+    "version": "v1.0.0",
+    "license": "MIT",
+    "notices": [
+      "licenses/go-modules/github.com_grandcat_zeroconf/LICENSE"
+    ]
+  },
+  {
+    "module": "github.com/miekg/dns",
+    "version": "v1.1.73",
+    "license": "BSD-3-Clause",
+    "notices": [
+      "licenses/go-modules/github.com_miekg_dns/LICENSE"
+    ]
+  },
+  {
+    "module": "github.com/pkg/errors",
+    "version": "v0.9.1",
+    "license": "BSD-2-Clause",
+    "notices": [
+      "licenses/go-modules/github.com_pkg_errors/LICENSE"
+    ]
+  },
+  {
+    "module": "golang.org/x/crypto",
+    "version": "v0.58.0",
+    "license": "BSD-3-Clause",
+    "notices": [
+      "licenses/go-modules/golang.org_x_crypto/LICENSE",
+      "licenses/go-modules/golang.org_x_crypto/PATENTS"
+    ]
+  },
+  {
+    "module": "golang.org/x/mod",
+    "version": "v0.38.0",
+    "license": "BSD-3-Clause",
+    "notices": [
+      "licenses/go-modules/golang.org_x_mod/LICENSE"
+    ]
+  },
+  {
+    "module": "golang.org/x/net",
+    "version": "v0.61.0",
+    "license": "BSD-3-Clause",
+    "notices": [
+      "licenses/go-modules/golang.org_x_net/LICENSE",
+      "licenses/go-modules/golang.org_x_net/PATENTS"
+    ]
+  },
+  {
+    "module": "golang.org/x/sync",
+    "version": "v0.22.0",
+    "license": "BSD-3-Clause",
+    "notices": [
+      "licenses/go-modules/golang.org_x_sync/LICENSE",
+      "licenses/go-modules/golang.org_x_sync/PATENTS"
+    ]
+  },
+  {
+    "module": "golang.org/x/sys",
+    "version": "v0.49.0",
+    "license": "BSD-3-Clause",
+    "notices": [
+      "licenses/go-modules/golang.org_x_sys/LICENSE",
+      "licenses/go-modules/golang.org_x_sys/PATENTS"
+    ]
+  },
+  {
+    "module": "golang.org/x/term",
+    "version": "v0.47.0",
+    "license": "BSD-3-Clause",
+    "notices": [
+      "licenses/go-modules/golang.org_x_term/LICENSE"
+    ]
+  },
+  {
+    "module": "golang.org/x/text",
+    "version": "v0.43.0",
+    "license": "BSD-3-Clause",
+    "notices": [
+      "licenses/go-modules/golang.org_x_text/LICENSE"
+    ]
+  },
+  {
+    "module": "golang.org/x/tools",
+    "version": "v0.48.0",
+    "license": "BSD-3-Clause",
+    "notices": [
+      "licenses/go-modules/golang.org_x_tools/LICENSE"
+    ]
+  },
+  {
+    "module": "golang.org/x/xerrors",
+    "version": "v0.0.0-20191011141410-1b5146add898",
+    "license": "BSD-3-Clause",
+    "notices": [
+      "licenses/go-modules/golang.org_x_xerrors/LICENSE"
+    ]
+  },
+  {
+    "module": "google.golang.org/protobuf",
+    "version": "v1.36.12",
+    "license": "BSD-3-Clause",
+    "notices": [
+      "licenses/go-modules/google.golang.org_protobuf/LICENSE",
+      "licenses/go-modules/google.golang.org_protobuf/PATENTS"
+    ]
+  }
+]
