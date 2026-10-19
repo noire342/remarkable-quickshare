@@ -23,8 +23,9 @@ The publication build was additionally checked on **19 October 2026**:
 - Unicast/multicast discovery and real UKEY2 encrypted PDF/EPUB transfers with ACK
   passed again against the publication receiver. Both files reached native Xochitl
   import; this sender remains a PC protocol test, not an Android end-to-end test.
-- Six isolated Linux tests passed, covering update/uninstall data preservation,
-  rollback after failed startup, rejection before service changes, and bundle integrity/notices.
+- Nine isolated Linux tests passed, covering update/uninstall data preservation,
+  rollback after failed startup, rejection before service changes, bundle integrity/notices,
+  and UI startup with an absent default setting, a corrupt copy or a configuration write failure.
 - Windows PowerShell 5.1 preserved the complete binary byte range and the exact
   remote shell argument through a fake SSH executable. The actual tablet installation
   used an authenticated SSH stream; the interactive Windows password prompt was not automated.

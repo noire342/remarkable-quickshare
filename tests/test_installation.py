@@ -128,6 +128,41 @@ esac
         self.assertFalse((self.root/'systemctl.log').exists())
         self.assert_owner_data_untouched()
 
+    def run_launcher(self, config, *, corrupt_copy=False, config_failure=False):
+        self.conf.write_text(config)
+        self.executable(self.original, '#!/bin/sh\necho stock-ui\n')
+        self.executable(self.base/'bin/xochitl-local-import', '#!/bin/sh\necho prepared-ui\n')
+        self.executable(self.fakebin/'logger', '#!/bin/sh\nexit 0\n')
+        self.executable(self.fakebin/'ip', '#!/bin/sh\nexit 1\n')
+        self.executable(self.fakebin/'sha256sum', '''#!/bin/sh
+case "$1" in
+  */usr/bin/xochitl) echo '87b574fc7ac1a15d502e96458a94a5279a189023bd476758e4aaca9bae13575a  original' ;;
+  *) echo "${COPY_HASH:-72deb4483772142ab12d08d12f1d25dbd4e7b1f449a9ead63df103f0ac612fe4}  prepared" ;;
+esac
+''')
+        if config_failure:
+            self.executable(self.fakebin/'sed', '#!/bin/sh\nexit 1\n')
+        env=dict(self.env)
+        if corrupt_copy:env['COPY_HASH']='invalid'
+        return subprocess.run(['sh',str(self.payload/'device/launch-xochitl.sh')],env=env,text=True,capture_output=True)
+
+    def test_launcher_handles_absent_default_and_missing_usb_interface(self):
+        result=self.run_launcher('[General]\nUnrelatedSetting=preserve\n')
+        self.assertEqual(result.returncode,0,result.stderr)
+        self.assertEqual(result.stdout.strip(),'prepared-ui')
+        self.assertIn('WebInterfaceEnabled=true',self.conf.read_text())
+        self.assertIn('UnrelatedSetting=preserve',self.conf.read_text())
+
+    def test_launcher_uses_stock_ui_if_copy_is_corrupt(self):
+        result=self.run_launcher('[General]\nWebInterfaceEnabled=false\n',corrupt_copy=True)
+        self.assertEqual(result.returncode,0,result.stderr)
+        self.assertEqual(result.stdout.strip(),'stock-ui')
+
+    def test_launcher_uses_stock_ui_if_configuration_cannot_be_saved(self):
+        result=self.run_launcher('[General]\nWebInterfaceEnabled=false\n',config_failure=True)
+        self.assertEqual(result.returncode,0,result.stderr)
+        self.assertEqual(result.stdout.strip(),'stock-ui')
+
 
 class DistributionTests(unittest.TestCase):
     def test_protocol_licenses_and_original_attribution_retained(self):
