@@ -61,7 +61,8 @@
     "version": "v0.38.0",
     "license": "BSD-3-Clause",
     "notices": [
-      "licenses/go-modules/golang.org_x_mod/LICENSE"
+      "licenses/go-modules/golang.org_x_mod/LICENSE",
+      "licenses/go-modules/golang.org_x_mod/PATENTS"
     ]
   },
   {
@@ -96,7 +97,8 @@
     "version": "v0.47.0",
     "license": "BSD-3-Clause",
     "notices": [
-      "licenses/go-modules/golang.org_x_term/LICENSE"
+      "licenses/go-modules/golang.org_x_term/LICENSE",
+      "licenses/go-modules/golang.org_x_term/PATENTS"
     ]
   },
   {
@@ -104,7 +106,8 @@
     "version": "v0.43.0",
     "license": "BSD-3-Clause",
     "notices": [
-      "licenses/go-modules/golang.org_x_text/LICENSE"
+      "licenses/go-modules/golang.org_x_text/LICENSE",
+      "licenses/go-modules/golang.org_x_text/PATENTS"
     ]
   },
   {
@@ -112,7 +115,8 @@
     "version": "v0.48.0",
     "license": "BSD-3-Clause",
     "notices": [
-      "licenses/go-modules/golang.org_x_tools/LICENSE"
+      "licenses/go-modules/golang.org_x_tools/LICENSE",
+      "licenses/go-modules/golang.org_x_tools/PATENTS"
     ]
   },
   {
@@ -120,7 +124,8 @@
     "version": "v0.0.0-20191011141410-1b5146add898",
     "license": "BSD-3-Clause",
     "notices": [
-      "licenses/go-modules/golang.org_x_xerrors/LICENSE"
+      "licenses/go-modules/golang.org_x_xerrors/LICENSE",
+      "licenses/go-modules/golang.org_x_xerrors/PATENTS"
     ]
   },
   {

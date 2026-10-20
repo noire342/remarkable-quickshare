@@ -10,6 +10,13 @@ rejected by the installer. This is an unofficial community project.
 Based on [KindShare by June Philip](https://github.com/unrealJune/kindshare),
 with a reMarkable importer, persistent queue and easy SSH installers.
 
+The commands below install the published **v0.1.0** release. The next version,
+**v0.2.0**, is in development and adds on-tablet confirmation and a persistent
+automatic-reception setting. It has not been released: EPUB and the remaining
+physical acceptance checks must pass before publication. See
+[confirmation mode](docs/CONFIRMATION.md) for the development behavior and checks.
+The development Windows installer also uses the Windows built-in `tar` command.
+
 ## Install from Windows
 
 Open **PowerShell** on your PC and paste:
@@ -59,6 +66,7 @@ use the tablet's limited BusyBox wget for HTTPS verification.
    and normal library synchronization.
 
 Files are accepted **automatically** from reachable senders. Use a trusted network.
+This describes v0.1.0; the development version defaults to **Ask every time**.
 The tablet cannot receive while asleep; this app preserves normal standby.
 Receiving only: sending from the tablet is not implemented. Limits are 100 MB
 (100,000,000 bytes) per file, 32 files / 300 MB per offer. DRM EPUBs are unsupported.
@@ -147,6 +155,11 @@ Lorenzo Garrone (noire342). KindShare's MIT copyright and license are preserved.
 Google protocol definitions and generated bindings retain **Apache-2.0**; Go
 dependencies retain their MIT/BSD notices. See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)
 and [licenses/](licenses/).
+
+The development confirmation interface uses XOVI and qt-resource-rebuilder.
+Those separate upstream components retain their GPL licenses; they are not
+covered by this project's MIT license. The installer obtains the pinned upstream
+archive separately. See the [XOVI provenance record](licenses/xovi-provenance.json).
 
 Xochitl is proprietary reMarkable software and is not covered by our MIT license.
 This project is not affiliated with reMarkable, Google or Samsung.

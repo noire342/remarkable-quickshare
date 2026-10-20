@@ -50,6 +50,44 @@ Release bundles carry this notice, the project MIT license and the complete
 `licenses/` directory. `scripts/collect_licenses.py --check` verifies that the
 reviewed module graph and copied license texts match the build environment.
 
+## XOVI confirmation interface (v0.2.0 development)
+
+The confirmation UI uses the separately installed
+[XOVI](https://github.com/asivery/xovi) loader and
+[qt-resource-rebuilder](https://github.com/asivery/rm-xovi-extensions/tree/6c709dd8416ddf89034831073d76fb4ee3372905/qt-resource-rebuilder),
+which incorporates [QMLDiff](https://github.com/asivery/qmldiff).
+These dependencies are not MIT components. The pinned upstream archive is
+`xovi-arm32.tar.gz` from `pre-v20-08092026`, SHA-256
+`c3e6bfedbd9c3dd844dbf661c848b87e4ec97b21554f91fd361eef3665edeb27`.
+The PC installer downloads that archive directly from upstream, verifies it and
+sends it over SSH when required; it is not embedded in our receiver release bundle.
+
+- The archive's `xovi.so` is byte-identical to the ARM32 asset in **XOVI v0.3.3**,
+  source commit `0c8d5269b55c851901d4e4a754dc2d7deab40b17`. That release carries
+  **GPL-3.0**, even though the current XOVI main branch now carries LGPL-3.0.
+  The current main-branch license must not be substituted for the pinned release's notice.
+- The extension/archive source is **rm-xovi-extensions**, commit
+  `6c709dd8416ddf89034831073d76fb4ee3372905`, under **GPL-3.0**.
+- Its QMLDiff gitlink is `a38cccc4e0de99c0fc7f8cb8bf963a1c234267b1`, under
+  **GPL-3.0**. The complete shared license text is retained in
+  [licenses/GPL-3.0.txt](licenses/GPL-3.0.txt).
+- The resource rebuilder's `uthash.h` and `utlist.h` retain Troy D. Hanson's
+  **BSD-1-Clause** notices, copied into `licenses/xovi-uthash-BSD-1-Clause.txt`
+  and `licenses/xovi-utlist-BSD-1-Clause.txt`.
+
+The [machine-readable provenance record](licenses/xovi-provenance.json) links the
+exact sources, build recipes and recorded component hashes. Upstream's archive
+build used an unpinned XOVI code generator checkout, mutable toolchain image and
+unlocked Rust build command. The available evidence identifies source snapshots;
+it does not establish a fully reproducible corresponding-source build of every
+byte in that archive. Do not redistribute a rebuilt or bundled GPL binary based
+only on this inventory without supplying and verifying its corresponding source.
+
+Our original QML, configuration, HTTP control code and integration remain under
+their stated MIT license. No upstream GPL implementation is copied into the Go
+receiver or relabeled as MIT. Existing XOVI installations retain the license and
+provenance of their actual installed version.
+
 ## Research and interoperability credits
 
 - [grishka/NearDrop](https://github.com/grishka/NearDrop): protocol documentation
@@ -63,8 +101,10 @@ our code or that those projects endorse this port.
 
 ## Not included
 
-Xochitl, reMarkable firmware, XOVI, KOReader and InkShelf are not distributed by
-this project. In particular, Xochitl is proprietary software provided by
+Xochitl, reMarkable firmware, XOVI native binaries, KOReader and InkShelf are not
+embedded in this project's release bundle. The development installer can obtain
+XOVI separately from its upstream distribution, as documented above.
+In particular, Xochitl is proprietary software provided by
 reMarkable. The installer uses the copy already present on the user's own
 supported tablet; the project MIT license grants no rights to that firmware.
 Product and protocol names belong to their respective owners. This is an

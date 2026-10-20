@@ -1,5 +1,9 @@
 # Architecture
 
+The following import pipeline describes the published v0.1.0 baseline. The
+v0.2.0 development build inserts the approval gate described below before
+creating a transfer directory or accepting file content.
+
 ```text
 Android / Quick Share sender
   -> mDNS discovery (_FC9F5ED42C8A._tcp)
@@ -40,3 +44,27 @@ and document library are never replaced by installation or update.
 
 The public source and binary bundle use explicit allowlists. Private device backups,
 credentials, host keys, per-device status, test logs and Xochitl copies are excluded.
+
+## Development approval gate
+
+UKEY2 already derives the connection authentication material. The approval layer
+formats its Quick Share-compatible four-digit code and snapshots the saved
+`acceptance_mode` (`ask` or `auto`) when a valid offer arrives. In `ask` mode,
+one request can wait for a tablet decision for 60 seconds. The connection reader
+continues handling keepalives and disconnection while approval is pending.
+Creating file output and the content-level ACCEPT response follow approval;
+transport handshake acceptance alone does not authorize content. Encrypted
+message sequence allocation and writes are serialized.
+
+The original QML UI is loaded through XOVI's resource rebuilder and talks to the
+Go process through an authenticated loopback HTTP control API. Settings, UI
+readiness and the pending offer are exposed to that local UI; decisions identify
+one live request. Long polling avoids continuous e-ink redraws. The control
+bearer token is generated on the tablet and is absent from public source/assets.
+The saved mode is separate from device identity. No live pending approval is
+restored after a process restart.
+
+An existing compatible XOVI installation is reused. When absent, the development
+installer obtains the pinned upstream ARM32 archive and sets up the required
+runtime without enabling its unrelated inactive extensions. Runtime dependency
+provenance is separate from the static receiver's Go module inventory.

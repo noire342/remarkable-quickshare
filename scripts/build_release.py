@@ -33,11 +33,19 @@ def main():
         files[name]=(ROOT/name).read_bytes()
     for path in (ROOT/'licenses').rglob('*'):
         if path.is_file():files[path.relative_to(ROOT).as_posix()]=path.read_bytes()
-    for name in ['install-device.sh','uninstall.sh','launch-xochitl.sh','50-quickshare.conf','remarkable-quickshare.service']:
+    for name in ['install-device.sh','install-ui.sh','uninstall.sh','launch-xochitl.sh','50-quickshare.conf','remarkable-quickshare.service','dependencies.env']:
         files['device/'+name]=(ROOT/'device'/name).read_bytes().replace(b'\r\n',b'\n')
-    try:commit=subprocess.check_output(['git','rev-parse','HEAD'],cwd=ROOT,text=True,stderr=subprocess.DEVNULL).strip()
-    except subprocess.CalledProcessError:commit='uncommitted'
-    files['SOURCE.json']=(json.dumps({'repository':'https://github.com/noire342/remarkable-quickshare','version':args.version,'commit':commit,'upstream_kindshare_commit':'25800e334961bfc7e7468a85b638fc16d7a12bc5','go_version':subprocess.check_output([args.go,'version'],text=True).strip(),'proprietary_firmware_included':False},indent=2)+'\n').encode()
+    for path in (ROOT/'ui').rglob('*'):
+        if path.is_file():
+            if path.name == 'Config.js':
+                raise SystemExit('Refusing to package private generated UI credentials')
+            files[path.relative_to(ROOT).as_posix()]=path.read_bytes().replace(b'\r\n',b'\n')
+    try:
+        commit=subprocess.check_output(['git','rev-parse','HEAD'],cwd=ROOT,text=True,stderr=subprocess.DEVNULL).strip()
+        dirty=bool(subprocess.check_output(['git','status','--porcelain'],cwd=ROOT,text=True).strip())
+    except subprocess.CalledProcessError:
+        commit='uncommitted';dirty=True
+    files['SOURCE.json']=(json.dumps({'repository':'https://github.com/noire342/remarkable-quickshare','version':args.version,'commit':commit,'working_tree_dirty':dirty,'upstream_kindshare_commit':'25800e334961bfc7e7468a85b638fc16d7a12bc5','go_version':subprocess.check_output([args.go,'version'],text=True).strip(),'proprietary_firmware_included':False},indent=2)+'\n').encode()
     files['PAYLOAD.sha256']=''.join(hashlib.sha256(content).hexdigest()+'  '+name+'\n' for name,content in sorted(files.items())).encode()
     # Explicit allowlist above: host backups, credentials, identities and firmware are unreachable.
     for name,content in files.items():
