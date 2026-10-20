@@ -1,5 +1,59 @@
 # Validation and compatibility
 
+## v0.2.0 development status
+
+The on-tablet confirmation/settings update is in development, **not released**.
+The v0.1.0 evidence below is not evidence that the new popup, default manual mode
+or automatic XOVI bootstrap has passed physical-device validation.
+
+Release acceptance requires tablet checks for the popup while reading/writing,
+mode persistence, accept/reject/timeout/cancellation, missing-UI behavior,
+existing-XOVI reuse, dependency bootstrap and recovery, plus native PDF and EPUB
+import. It also requires a real Android-originated send and matching connection
+codes. A PC protocol sender alone does not satisfy that Android check. The user
+later confirmed an Android PDF transfer and matching codes; EPUB and the
+remaining physical checks below are still required before publication.
+
+Development checks completed on **20 October 2026**:
+
+- Go tests and vet pass, including Google PIN vectors, encrypted approval flows,
+  early-content rejection, cancellation, expiry and concurrent encrypted writes.
+- Thirty Python tests pass: twenty-four installer/transport cases, four release
+  verification cases and two QMLDiff parser/patch cases. The latter use original
+  synthetic fixtures; no Xochitl resources are distributed with the tests.
+- The pinned QMLDiff parser also applied the patch offline to private resources
+  from the exact supported firmware. Windows PowerShell 5.1 preserved the verified
+  dependency/bundle transport and exact remote command through a fake SSH client.
+- The development package installed on the physical tablet using its existing
+  XOVI installation. Its original executable, identity and document inventory
+  were unchanged during installation. The native import API and authenticated
+  UI health checks passed; automatic restarts were disabled during validation
+  and the temporary guard was removed after success.
+- The user confirmed the native Settings page, radio selection in both
+  directions, the icon, placement directly below Wi-Fi and Help remaining last.
+  The saved manual setting survived subsequent candidate updates.
+- An independent PC protocol probe displayed a four-digit code matching the
+  sender's UKEY2 result and canceled successfully. A second simultaneous manual
+  offer was rejected while a real sender's request was pending.
+- The user confirmed a successful real **Windows Quick Share PDF** send through
+  the popup; the receiver acknowledged the complete file and native import
+  registered it in Xochitl.
+- The user additionally confirmed a successful **Android Quick Share PDF** send
+  and explicitly confirmed that the four-digit codes matched on both devices.
+  Android EPUB reception has not yet been confirmed.
+
+An early draft QMD caused Xochitl startup failures. The corrected patch was
+validated offline before reinstalling; the installer now has restart suppression
+and persistent recovery guards with regression coverage. No further physical
+testing was performed after the user asked to end those tests.
+
+Still required before release: Android EPUB reception and native conversion,
+confirmation while reading/writing, the remaining physical rejection/expiry and
+missing-UI scenarios, an owned-runtime bootstrap, final reboot and uninstall
+checks. Automated coverage of these paths is not physical-device evidence.
+
+## Published v0.1.0 baseline
+
 The initial device baseline was validated on **18 October 2026**:
 
 | Area | Evidence | Limit |

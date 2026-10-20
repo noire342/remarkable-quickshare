@@ -9,7 +9,7 @@ StartLimitBurst=10
 [Service]
 Type=simple
 WorkingDirectory=/home/root/quickshare
-ExecStart=/home/root/quickshare/bin/kindshare -daemon -iface wlan0 -devicetype 3 -identity /home/root/quickshare/identity -dest /home/root/quickshare/inbox -import-url http://10.11.99.1 -announce 60s
+ExecStart=/home/root/quickshare/bin/kindshare -daemon -iface wlan0 -devicetype 3 -identity /home/root/quickshare/identity -dest /home/root/quickshare/inbox -import-url http://10.11.99.1 -announce 60s -settings /home/root/quickshare/settings.json -control-token /home/root/quickshare/control-token
 Restart=on-failure
 RestartSec=5
 UMask=0077

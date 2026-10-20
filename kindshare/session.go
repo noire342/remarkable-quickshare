@@ -25,6 +25,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"time"
 	"unicode"
 
 	"google.golang.org/protobuf/proto"
@@ -54,35 +55,47 @@ type session struct {
 	bytesBuf map[int64][]byte
 
 	// FILE payloads, keyed by payload id, described by the Introduction.
-	files       map[int64]*incomingFile
-	transferDir string
+	files                    map[int64]*incomingFile
+	transferDir              string
+	controller               *approvalManager
+	sender                   string
+	offered                  *sharing.IntroductionFrame
+	pendingID                string
+	approvalResult           <-chan bool
+	introductionPayloadID    int64
+	hasIntroductionPayloadID bool
 }
 
 func newSession(c net.Conn, k *sessionKeys, dest string) *session {
 	return &session{
-		conn:     c,
-		keys:     k,
-		dest:     dest,
-		bytesBuf: map[int64][]byte{},
-		files:    map[int64]*incomingFile{},
+		conn:       c,
+		keys:       k,
+		dest:       dest,
+		bytesBuf:   map[int64][]byte{},
+		files:      map[int64]*incomingFile{},
+		controller: activeApproval,
 	}
 }
 
 // sendOffline encrypts and writes one OfflineFrame.
 func (s *session) sendOffline(f *connections.OfflineFrame) error {
+	if s.keys == nil {
+		return fmt.Errorf("encrypted session keys unavailable")
+	}
 	b, err := proto.Marshal(f)
 	if err != nil {
 		return err
 	}
 	s.mu.Lock()
+	defer s.mu.Unlock()
 	s.seq++
 	seq := s.seq
-	s.mu.Unlock()
 
 	enc, err := s.keys.encrypt(b, seq)
 	if err != nil {
 		return err
 	}
+	s.conn.SetWriteDeadline(time.Now().Add(2 * time.Minute))
 	return writeFrame(s.conn, enc)
 }
 
@@ -160,6 +173,26 @@ func (s *session) handlePayload(pt *connections.PayloadTransferFrame) error {
 	id := h.GetId()
 	last := c.GetFlags()&1 != 0
 
+	// Cancellation travels as a CONTROL packet, not as a (possibly empty)
+	// DATA chunk. In particular, it must never open a file or leave a prompt
+	// waiting for an offer the sender has withdrawn.
+	if pt.GetPacketType() == connections.PayloadTransferFrame_CONTROL {
+		event := pt.GetControlMessage().GetEvent()
+		if event == connections.PayloadTransferFrame_ControlMessage_PAYLOAD_CANCELED || event == connections.PayloadTransferFrame_ControlMessage_PAYLOAD_ERROR {
+			delete(s.bytesBuf, id)
+			if (s.offered != nil && s.hasIntroductionPayloadID && id == s.introductionPayloadID) || s.offeredFileID(id) {
+				return s.cancelOffer("sender canceled or failed an offered payload")
+			}
+		}
+		return nil
+	}
+	if pt.GetPacketType() == connections.PayloadTransferFrame_PAYLOAD_ACK {
+		return nil
+	}
+	if pt.GetPacketType() != connections.PayloadTransferFrame_DATA {
+		return fmt.Errorf("invalid payload packet type")
+	}
+
 	switch h.GetType() {
 	case connections.PayloadTransferFrame_PayloadHeader_BYTES:
 		if len(s.bytesBuf) > 16 || len(s.bytesBuf[id])+len(c.GetBody()) > 1<<20 {
@@ -176,11 +209,18 @@ func (s *session) handlePayload(pt *connections.PayloadTransferFrame) error {
 			log.Printf("     (bytes payload %d is not a sharing.Frame: %v)", id, err)
 			return nil
 		}
+		if sf.GetV1().GetType() == sharing.V1Frame_INTRODUCTION && s.offered == nil {
+			s.introductionPayloadID = id
+			s.hasIntroductionPayloadID = true
+		}
 		return s.handleSharing(&sf)
 
 	case connections.PayloadTransferFrame_PayloadHeader_FILE:
 		fi := s.files[id]
 		if fi == nil {
+			if s.pendingID != "" {
+				return fmt.Errorf("file data received before confirmation")
+			}
 			// A file we were never introduced to; ignore rather than guess.
 			return nil
 		}
@@ -297,6 +337,8 @@ func (s *session) handleSharing(f *sharing.Frame) error {
 	log.Printf("     sharing frame: %v", v1.GetType())
 
 	switch v1.GetType() {
+	case sharing.V1Frame_CANCEL:
+		return s.cancelOffer("sender canceled transfer")
 	case sharing.V1Frame_PAIRED_KEY_ENCRYPTION:
 		// We have no paired certificates, so this is deliberately random: the
 		// peer cannot verify us, which downgrades to the "unknown device"
@@ -325,9 +367,9 @@ func (s *session) handleSharing(f *sharing.Frame) error {
 
 	case sharing.V1Frame_INTRODUCTION:
 		intro := v1.GetIntroduction()
-		if len(intro.GetFileMetadata()) == 0 || len(intro.GetFileMetadata()) > 32 || len(s.files) != 0 {
+		if len(intro.GetFileMetadata()) == 0 || len(intro.GetFileMetadata()) > 32 || len(s.files) != 0 || s.offered != nil {
 			log.Printf("     introduction with no files; rejecting")
-			return s.sendSharingFrame(rejectFrame())
+			return s.rejectOffer(fmt.Errorf("empty, excessive or repeated introduction"))
 		}
 		var total int64
 		names := map[string]bool{}
@@ -336,50 +378,103 @@ func (s *session) handleSharing(f *sharing.Frame) error {
 			name := safeBase(m.GetName())
 			ext := strings.ToLower(filepath.Ext(name))
 			if len(name) > 200 || (ext != ".pdf" && ext != ".epub") || m.GetSize() <= 0 || m.GetSize() > 100000000 || names[name] || ids[m.GetPayloadId()] {
-				return s.sendSharingFrame(rejectFrame())
+				return s.rejectOffer(fmt.Errorf("invalid offered metadata"))
 			}
 			names[name] = true
 			ids[m.GetPayloadId()] = true
 			total += m.GetSize()
 		}
 		if total > 300000000 {
-			return s.sendSharingFrame(rejectFrame())
+			return s.rejectOffer(fmt.Errorf("offered total exceeds limit"))
 		}
-		if err := checkFreeSpace(s.dest, total); err != nil {
-			return err
-		}
-		dir, err := os.MkdirTemp(s.dest, "transfer-")
-		if err != nil {
-			return err
-		}
-		s.transferDir = dir
+		documents := make([]offeredDocument, 0, len(intro.GetFileMetadata()))
 		for _, m := range intro.GetFileMetadata() {
-			name := safeBase(m.GetName())
-			s.files[m.GetPayloadId()] = &incomingFile{
-				name:    name,
-				size:    m.GetSize(),
-				path:    filepath.Join(dir, name),
-				partial: filepath.Join(dir, name+".partial"),
-			}
-			log.Printf("     offered: %q (%d bytes, %v)", name, m.GetSize(), m.GetType())
+			documents = append(documents, offeredDocument{Name: safeBase(m.GetName()), Size: m.GetSize()})
 		}
-		// Auto-accept: this device exists to receive its owner's books, and
-		// there is no practical way to prompt mid-transfer on e-ink.
-		return s.sendSharingFrame(&sharing.Frame{
-			Version: sharing.Frame_V1.Enum(),
-			V1: &sharing.V1Frame{
-				Type: sharing.V1Frame_RESPONSE.Enum(),
-				ConnectionResponse: &sharing.ConnectionResponseFrame{
-					Status: sharing.ConnectionResponseFrame_ACCEPT.Enum(),
-				},
-			},
-		})
+		if s.controller == nil || s.keys == nil {
+			return s.rejectOffer(fmt.Errorf("confirmation controller unavailable"))
+		}
+		automatic, pending, err := s.controller.offer(s.sender, verificationPIN(s.keys.authString), documents, total)
+		if err != nil {
+			return s.rejectOffer(err)
+		}
+		s.offered = proto.Clone(intro).(*sharing.IntroductionFrame)
+		if automatic {
+			return s.acceptOffer()
+		}
+		s.pendingID = pending.offer.ID
+		s.approvalResult = pending.result
+		return nil
 	}
 	return nil
 }
 
+func (s *session) offeredFileID(id int64) bool {
+	for _, file := range s.offered.GetFileMetadata() {
+		if file.GetPayloadId() == id {
+			return true
+		}
+	}
+	return false
+}
+func (s *session) cancelOffer(reason string) error {
+	if s.controller != nil && s.pendingID != "" {
+		s.controller.cancel(s.pendingID)
+	}
+	s.pendingID = ""
+	s.approvalResult = nil
+	return fmt.Errorf("%s", reason)
+}
+
+func (s *session) acceptOffer() error {
+	var total int64
+	for _, m := range s.offered.GetFileMetadata() {
+		total += m.GetSize()
+	}
+	if err := checkFreeSpace(s.dest, total); err != nil {
+		return err
+	}
+	dir, err := os.MkdirTemp(s.dest, "transfer-")
+	if err != nil {
+		return err
+	}
+	s.transferDir = dir
+	for _, m := range s.offered.GetFileMetadata() {
+		name := safeBase(m.GetName())
+		s.files[m.GetPayloadId()] = &incomingFile{name: name, size: m.GetSize(), path: filepath.Join(dir, name), partial: filepath.Join(dir, name+".partial")}
+		log.Printf("     accepted: %q (%d bytes)", name, m.GetSize())
+	}
+	return s.sendSharingFrame(&sharing.Frame{
+		Version: sharing.Frame_V1.Enum(),
+		V1: &sharing.V1Frame{
+			Type: sharing.V1Frame_RESPONSE.Enum(),
+			ConnectionResponse: &sharing.ConnectionResponseFrame{
+				Status: sharing.ConnectionResponseFrame_ACCEPT.Enum(),
+			},
+		},
+	})
+}
+
+func (s *session) rejectOffer(reason error) error {
+	if err := s.sendSharingFrame(rejectFrame()); err != nil {
+		return err
+	}
+	return fmt.Errorf("offer rejected: %w", reason)
+}
+func (s *session) finishApproval(accepted bool) error {
+	s.pendingID = ""
+	s.approvalResult = nil
+	if !accepted {
+		return s.rejectOffer(fmt.Errorf("declined, expired or UI unavailable"))
+	}
+	return s.acceptOffer()
+}
+
 // Interrupted transfers never enter the import queue or leave descriptors open.
 func (s *session) cleanup() {
+	if s.controller != nil && s.pendingID != "" {
+		s.controller.cancel(s.pendingID)
+	}
 	for _, f := range s.files {
 		if f.f != nil {
 			f.f.Close()

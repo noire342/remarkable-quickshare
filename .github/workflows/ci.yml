@@ -59,3 +59,17 @@ jobs:
             release/SHA256SUMS
             release/install.ps1
             release/install.sh
+  qml-patch:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Build the pinned QMLDiff validation tool
+        run: |
+          git clone https://github.com/asivery/qmldiff.git "$RUNNER_TEMP/qmldiff"
+          git -C "$RUNNER_TEMP/qmldiff" checkout a38cccc4e0de99c0fc7f8cb8bf963a1c234267b1
+          rustup toolchain install 1.85.1 --profile minimal
+          cargo +1.85.1 build --locked --manifest-path "$RUNNER_TEMP/qmldiff/Cargo.toml" --bin qmldiff
+      - name: Validate our QML patch on synthetic resources
+        env:
+          QMLDIFF_BIN: ${{ runner.temp }}/qmldiff/target/debug/qmldiff
+        run: python -m unittest discover -s tests -p test_ui.py -v

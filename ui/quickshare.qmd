@@ -1,0 +1,131 @@
+; SPDX-License-Identifier: MIT
+; Copyright (c) 2026 Lorenzo Garrone (noire342)
+; Firmware-specific selectors only; no original Xochitl resources are distributed.
+; Runtime assets are installed in /home/root/quickshare/ui/.
+VERSION 3.27.3.0
+
+AFFECT [[3457600971405225497]]
+    TRAVERSE QtObject
+        LOCATE AFTER ALL
+        INSERT { property var quickShareController: null }
+    END TRAVERSE
+END AFFECT
+
+AFFECT [[2328484894988065446]]
+    TRAVERSE ?#[[6504254477]]
+        LOCATE AFTER ALL
+        INSERT {
+            Loader {
+                id: quickShareHost
+                source: "file:///home/root/quickshare/ui/QuickShare.qml"
+                onLoaded: {
+                    Global.quickShareController = item;
+                    item.defaultDialogHost = root;
+                    item.screenAvailable = Qt.binding(function() {
+                        return !root.passcodeHandler.userLocked && BatteryManager.displayState === BatteryManager.Normal;
+                    });
+                }
+                Component.onDestruction: Global.quickShareController = null
+            }
+        }
+    END TRAVERSE
+END AFFECT
+
+AFFECT [[12599552112012170435]]
+    TRAVERSE ?#[[7713561876955258]]
+        LOCATE AFTER ALL
+        INSERT {
+            Loader {
+                id: quickShareSettingsPage
+                anchors.fill: payloadLoader
+                active: settings._selectedIndex === 7001
+                visible: active
+                source: "file:///home/root/quickshare/ui/QuickShareSettings.qml"
+                onLoaded: item.controller = Qt.binding(function() { return Global.quickShareController; })
+            }
+            Item {
+                id: quickShareDialogHost
+                visible: false
+                property var controller: Global.quickShareController
+                property bool activeHost: settings.visible
+                function updateHost() {
+                    if (!controller) return;
+                    if (activeHost) controller.settingsDialogHost = settings;
+                    else if (controller.settingsDialogHost === settings) controller.settingsDialogHost = null;
+                }
+                onControllerChanged: updateHost()
+                onActiveHostChanged: updateHost()
+                Component.onCompleted: updateHost()
+                Component.onDestruction: {
+                    if (controller && controller.settingsDialogHost === settings) controller.settingsDialogHost = null;
+                }
+            }
+            Component {
+                id: quickShareNativeRows
+                Item {
+                    id: quickShareNativeRow
+                    required property var model
+                    property var nativeEntry: null
+                    readonly property var quickShareEntry: quickShareAfterWifi.item
+                    visible: model.visible
+                    Layout.fillWidth: true
+                    implicitWidth: nativeEntry ? nativeEntry.implicitWidth : 0
+                    implicitHeight: quickShareRowContents.implicitHeight
+                    Column {
+                        id: quickShareRowContents
+                        width: parent.width
+                        Item {
+                            id: quickShareNativeSlot
+                            width: parent.width
+                            height: quickShareNativeRow.nativeEntry ? quickShareNativeRow.nativeEntry.implicitHeight : 0
+                        }
+                        Loader {
+                            id: quickShareAfterWifi
+                            width: parent.width
+                            active: quickShareNativeRow.model.index === SettingsPage.Wifi
+                            sourceComponent: quickShareSidebarEntry
+                        }
+                    }
+                    Component.onCompleted: {
+                        nativeEntry = settings.delegate.createObject(quickShareNativeSlot, {model: model});
+                        if (nativeEntry) nativeEntry.width = Qt.binding(function() { return quickShareNativeSlot.width; });
+                        quickShareNavigationOrder.restart();
+                    }
+                }
+            }
+            Component {
+                id: quickShareSidebarEntry
+                ArkControls.SidebarItem {
+                    id: quickShareSettingsEntry
+                    type: ArkTokens.Sidebar.primary
+                    text: settings.showLabels ? "Quick Share" : ""
+                    iconSource: "qrc:/ark/icons/import"
+                    highlighted: settings.highlightedIndex === 7001
+                    showFocus: settings.current === quickShareSettingsEntry
+                    onTriggered: activate()
+                    function activate() {
+                        settings.highlightedIndex = 7001;
+                        settings.sideBarItemClicked(7001);
+                    }
+                }
+            }
+            Timer {
+                id: quickShareNavigationOrder
+                interval: 0
+                onTriggered: {
+                    var ordered = [back];
+                    for (var i = 0; i < settingsRepeater.count; ++i) {
+                        var row = settingsRepeater.itemAt(i);
+                        if (!row || !row.visible) continue;
+                        if (row.nativeEntry) ordered.push(row.nativeEntry);
+                        if (row.quickShareEntry) ordered.push(row.quickShareEntry);
+                    }
+                    settings.navigationModel = ordered;
+                }
+            }
+        }
+    END TRAVERSE
+    TRAVERSE ?#[[4419331897656319922]]
+        REPLACE delegate WITH { delegate: quickShareNativeRows }
+    END TRAVERSE
+END AFFECT

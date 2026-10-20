@@ -125,30 +125,35 @@ var buildVersion = "dev"
 
 func main() {
 	var (
-		name          = flag.String("name", defaultDeviceName, "override the identity file's device name for this run")
-		idFlag        = flag.String("id", "", "override the identity file's 4-char id for this run")
-		idPath        = flag.String("identity", defaultIdentityPath, "where the persistent device identity is stored")
-		port          = flag.Int("port", 12345, "TCP port to advertise and listen on")
-		iface         = flag.String("iface", "wlan0", "interface to advertise on (empty = all)")
-		dtype         = flag.Int("devicetype", deviceTypeLaptop, "0 unknown 1 phone 2 tablet 3 laptop")
-		browse        = flag.Bool("browse", false, "also browse for other Quick Share advertisers")
-		advertise     = flag.Bool("advertise", true, "advertise ourselves (set false for a pure checker)")
-		svc           = flag.String("service", serviceType, "service type to browse for")
-		doSniff       = flag.Bool("sniff", false, "raw mDNS sniffer: join 224.0.0.251:5353 and log every packet")
-		doQuery       = flag.Bool("query", true, "in sniff mode, also send PTR queries")
-		qname         = flag.String("qname", "", "sniff mode: query this exact record name")
-		qtype         = flag.String("qtype", "PTR", "sniff mode: record type (PTR/TXT/SRV/ANY)")
-		byte0         = flag.Int("byte0", -1, "override endpoint-info byte 0 (e.g. 0x16); -1 = compute")
-		noName        = flag.Bool("noname", false, "omit the device-name field entirely")
-		dest          = flag.String("dest", "/home/root/quickshare/inbox", "where received files are written")
-		daemon        = flag.Bool("daemon", false, "run as a network-aware always-on receiver")
-		native        = flag.Bool("nativemdns", true, "use our own mDNS responder instead of the zeroconf library")
-		announce      = flag.Duration("announce", defaultAnnounceEvery, "how often the native responder re-announces")
-		importURL     = flag.String("import-url", "", "local Xochitl API base URL; enables durable PDF/EPUB import")
-		showVersion   = flag.Bool("version", false, "print the release version")
-		prepareSource = flag.String("prepare-xochitl", "", "prepare a local copy of the installed, supported Xochitl image")
-		prepareOutput = flag.String("xochitl-output", "", "output path for -prepare-xochitl; original is never overwritten")
-		healthURL     = flag.String("check-import-api", "", "check the native import API and exit")
+		name             = flag.String("name", defaultDeviceName, "override the identity file's device name for this run")
+		idFlag           = flag.String("id", "", "override the identity file's 4-char id for this run")
+		idPath           = flag.String("identity", defaultIdentityPath, "where the persistent device identity is stored")
+		port             = flag.Int("port", 12345, "TCP port to advertise and listen on")
+		iface            = flag.String("iface", "wlan0", "interface to advertise on (empty = all)")
+		dtype            = flag.Int("devicetype", deviceTypeLaptop, "0 unknown 1 phone 2 tablet 3 laptop")
+		browse           = flag.Bool("browse", false, "also browse for other Quick Share advertisers")
+		advertise        = flag.Bool("advertise", true, "advertise ourselves (set false for a pure checker)")
+		svc              = flag.String("service", serviceType, "service type to browse for")
+		doSniff          = flag.Bool("sniff", false, "raw mDNS sniffer: join 224.0.0.251:5353 and log every packet")
+		doQuery          = flag.Bool("query", true, "in sniff mode, also send PTR queries")
+		qname            = flag.String("qname", "", "sniff mode: query this exact record name")
+		qtype            = flag.String("qtype", "PTR", "sniff mode: record type (PTR/TXT/SRV/ANY)")
+		byte0            = flag.Int("byte0", -1, "override endpoint-info byte 0 (e.g. 0x16); -1 = compute")
+		noName           = flag.Bool("noname", false, "omit the device-name field entirely")
+		dest             = flag.String("dest", "/home/root/quickshare/inbox", "where received files are written")
+		daemon           = flag.Bool("daemon", false, "run as a network-aware always-on receiver")
+		native           = flag.Bool("nativemdns", true, "use our own mDNS responder instead of the zeroconf library")
+		announce         = flag.Duration("announce", defaultAnnounceEvery, "how often the native responder re-announces")
+		importURL        = flag.String("import-url", "", "local Xochitl API base URL; enables durable PDF/EPUB import")
+		showVersion      = flag.Bool("version", false, "print the release version")
+		prepareSource    = flag.String("prepare-xochitl", "", "prepare a local copy of the installed, supported Xochitl image")
+		prepareOutput    = flag.String("xochitl-output", "", "output path for -prepare-xochitl; original is never overwritten")
+		healthURL        = flag.String("check-import-api", "", "check the native import API and exit")
+		settingsPath     = flag.String("settings", defaultSettingsPath, "persistent receive mode configuration")
+		controlTokenPath = flag.String("control-token", defaultControlTokenPath, "private confirmation UI token")
+		controlAddress   = flag.String("control-listen", defaultControlListen, "loopback confirmation API address")
+		initControl      = flag.Bool("init-control", false, "initialize private control token and settings, then exit")
+		checkControl     = flag.Bool("check-control-api", false, "check authenticated confirmation UI health, then exit")
 	)
 	flag.Parse()
 	if *showVersion {
@@ -167,7 +172,35 @@ func main() {
 		}
 		return
 	}
+	if *initControl || *checkControl {
+		token, err := loadControlToken(*controlTokenPath)
+		if err != nil {
+			log.Fatal(err)
+		}
+		if *checkControl {
+			if err := checkControlAPI(*controlAddress, token); err != nil {
+				log.Fatal(err)
+			}
+			return
+		}
+		manager := newApprovalManager(*settingsPath)
+		if err := manager.setMode(manager.settings.AcceptanceMode); err != nil {
+			log.Fatal(err)
+		}
+		return
+	}
 	destDir = dest
+	activeApproval = newApprovalManager(*settingsPath)
+	token, err := loadControlToken(*controlTokenPath)
+	if err != nil {
+		log.Fatal(err)
+	}
+	controlServer, err := listenControl(*controlAddress, activeApproval, token)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer stopControl(controlServer)
+	defer activeApproval.close()
 	if *importURL != "" {
 		recoverInbox(*dest)
 		go runImporter(*dest, *importURL)
@@ -378,7 +411,12 @@ func handle(c net.Conn) {
 		log.Printf("  parse OfflineFrame: %v (%d bytes: %x)", err, len(raw), head(raw))
 		return
 	}
+	sender := ""
 	if req := off.GetV1().GetConnectionRequest(); req != nil {
+		sender = endpointName(req.GetEndpointInfo())
+		if sender == "" {
+			sender = req.GetEndpointName()
+		}
 		log.Printf("  ConnectionRequest: endpoint_id=%q name=%q",
 			req.GetEndpointId(), endpointName(req.GetEndpointInfo()))
 	} else {
@@ -408,13 +446,30 @@ func handle(c net.Conn) {
 	log.Printf("  sent ConnectionResponse (ACCEPT)")
 
 	// --- 4. run the sharing state machine ----------------------------------
-	sess := newSession(c, keys, *destDir)
-	defer sess.cleanup()
-	for {
-		// Each frame resets the clock: a large file legitimately takes minutes.
-		c.SetDeadline(time.Now().Add(2 * time.Minute))
+	runSharingSession(c, keys, sender, *destDir, activeApproval)
+}
 
-		raw, err := readFrame(c)
+func runSharingSession(c net.Conn, keys *sessionKeys, sender, destination string, controller *approvalManager) {
+	sess := newSession(c, keys, destination)
+	sess.controller = controller
+	sess.sender = sender
+	defer sess.cleanup()
+	frames := make(chan connectionFrame, 1)
+	readStop := make(chan struct{})
+	defer close(readStop)
+	go readConnectionFrames(c, frames, readStop)
+	for {
+		var packet connectionFrame
+		select {
+		case accepted := <-sess.approvalResult:
+			if err := sess.finishApproval(accepted); err != nil {
+				log.Printf("  session ended: %v", err)
+				return
+			}
+			continue
+		case packet = <-frames:
+		}
+		raw, err := packet.data, packet.err
 		if err != nil {
 			log.Printf("  read: %v", err)
 			return
@@ -442,6 +497,26 @@ func handle(c net.Conn) {
 
 		if err := sess.handleOffline(&f); err != nil {
 			log.Printf("  session ended: %v", err)
+			return
+		}
+	}
+}
+
+type connectionFrame struct {
+	data []byte
+	err  error
+}
+
+func readConnectionFrames(c net.Conn, frames chan<- connectionFrame, stop <-chan struct{}) {
+	for {
+		c.SetReadDeadline(time.Now().Add(2 * time.Minute))
+		data, err := readFrame(c)
+		select {
+		case frames <- connectionFrame{data, err}:
+		case <-stop:
+			return
+		}
+		if err != nil {
 			return
 		}
 	}

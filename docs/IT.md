@@ -1,5 +1,10 @@
 # Installazione rapida
 
+I comandi di questa pagina installano la release pubblicata **v0.1.0**.
+La **v0.2.0 è in sviluppo**, con conferma sul tablet e scelta persistente della
+ricezione automatica; sarà pubblicata solo dopo il collaudo fisico previsto,
+compreso l'invio completo da Android. Vedi [la nuova conferma](CONFIRMATION.md).
+
 Supporto iniziale: **reMarkable 2, firmware 3.27.3.0**. Non installare su Paper Pro
 o su firmware diversi: l'installer li rifiuta prima di riavviare l'interfaccia.
 
@@ -20,6 +25,8 @@ l'installazione precedente. Non distribuiamo binari del firmware reMarkable.
 Per inviare: tablet sveglio, stessa rete Wi-Fi, PDF/EPUB → Condividi → Quick Share
 → **reMarkable 2 XXXX**. Il documento entra in My Files automaticamente.
 I file vengono accettati senza conferma sul tablet: usa reti fidate.
+Questo è il comportamento di v0.1.0; la versione in sviluppo parte da
+**Chiedi sempre**.
 
 Per aggiornare, riesegui l'installer. Per disinstallare:
 

@@ -7,6 +7,7 @@ import (
 	"crypto/sha256"
 	"crypto/sha512"
 	"fmt"
+	"io"
 	"math/big"
 	"net"
 	"os"
@@ -72,12 +73,13 @@ func smokeClientKeys(t *testing.T, c net.Conn) *sessionKeys {
 	ikm := sha256.Sum256(dh)
 	info := append(append([]byte{}, init...), serverRaw...)
 	next := hkdfBytes(ikm[:], []byte("UKEY2 v1 next"), info, 32)
+	authString := hkdfBytes(ikm[:], []byte("UKEY2 v1 auth"), info, 32)
 	clientKey := hkdfBytes(next, saltD2D, []byte("client"), 32)
 	serverKey := hkdfBytes(next, saltD2D, []byte("server"), 32)
 	if err := writeFrame(c, finish); err != nil {
 		t.Fatal(err)
 	}
-	return &sessionKeys{encryptKey: hkdfBytes(clientKey, saltEncMac, []byte("ENC:2"), 32), sendHMAC: hkdfBytes(clientKey, saltEncMac, []byte("SIG:1"), 32), decryptKey: hkdfBytes(serverKey, saltEncMac, []byte("ENC:2"), 32), receiveHMAC: hkdfBytes(serverKey, saltEncMac, []byte("SIG:1"), 32)}
+	return &sessionKeys{authString: authString, encryptKey: hkdfBytes(clientKey, saltEncMac, []byte("ENC:2"), 32), sendHMAC: hkdfBytes(clientKey, saltEncMac, []byte("SIG:1"), 32), decryptKey: hkdfBytes(serverKey, saltEncMac, []byte("ENC:2"), 32), receiveHMAC: hkdfBytes(serverKey, saltEncMac, []byte("SIG:1"), 32)}
 }
 
 func smokeSharingResponse(t *testing.T, s *session) *sharing.Frame {
@@ -130,6 +132,58 @@ func TestDeviceDiscovery(t *testing.T) {
 		t.Fatal("no discovery answer")
 	}
 	t.Log(r.String())
+}
+
+// This opt-in probe shows a real confirmation without sending document data.
+// It cancels after 20 seconds; do not press Accept during this particular check.
+func TestDevicePromptCancellation(t *testing.T) {
+	host := os.Getenv("REMARKABLE_TEST_HOST")
+	if host == "" || os.Getenv("REMARKABLE_TEST_PROMPT_PROBE") != "1" {
+		t.Skip("opt-in physical prompt probe")
+	}
+	c, err := net.DialTimeout("tcp", net.JoinHostPort(host, "12345"), 5*time.Second)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer c.Close()
+	c.SetDeadline(time.Now().Add(35 * time.Second))
+	request := &connections.OfflineFrame{Version: connections.OfflineFrame_V1.Enum(), V1: &connections.V1Frame{Type: connections.V1Frame_CONNECTION_REQUEST.Enum(), ConnectionRequest: &connections.ConnectionRequestFrame{EndpointId: proto.String("TEST"), EndpointName: proto.String("PC verifica popup")}}}
+	if err := writeFrame(c, marshalSmoke(t, request)); err != nil {
+		t.Fatal(err)
+	}
+	keys := smokeClientKeys(t, c)
+	if err := sendConnectionResponse(c); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := readFrame(c); err != nil {
+		t.Fatal(err)
+	}
+	s := newSession(c, keys, "")
+	for _, frameType := range []sharing.V1Frame_FrameType{sharing.V1Frame_PAIRED_KEY_ENCRYPTION, sharing.V1Frame_PAIRED_KEY_RESULT} {
+		frame := &sharing.Frame{Version: sharing.Frame_V1.Enum(), V1: &sharing.V1Frame{Type: frameType.Enum()}}
+		if frameType == sharing.V1Frame_PAIRED_KEY_ENCRYPTION {
+			frame.V1.PairedKeyEncryption = &sharing.PairedKeyEncryptionFrame{SignedData: randBytes(72), SecretIdHash: randBytes(6)}
+		} else {
+			frame.V1.PairedKeyResult = &sharing.PairedKeyResultFrame{Status: sharing.PairedKeyResultFrame_UNABLE.Enum()}
+		}
+		if err := s.sendSharingFrame(frame); err != nil {
+			t.Fatal(err)
+		}
+		smokeSharingResponse(t, s)
+	}
+	intro := &sharing.Frame{Version: sharing.Frame_V1.Enum(), V1: &sharing.V1Frame{Type: sharing.V1Frame_INTRODUCTION.Enum(), Introduction: &sharing.IntroductionFrame{FileMetadata: []*sharing.FileMetadata{{Name: proto.String("Verifica popup.pdf"), Type: sharing.FileMetadata_DOCUMENT.Enum(), PayloadId: proto.Int64(86420), Size: proto.Int64(1024)}}}}}
+	if err := s.sendSharingFrame(intro); err != nil {
+		t.Fatal(err)
+	}
+	t.Logf("Popup verification code: %s. No file data sent; cancellation in 20 seconds.", verificationPIN(keys.authString))
+	time.Sleep(20 * time.Second)
+	if err := s.sendSharingFrame(&sharing.Frame{Version: sharing.Frame_V1.Enum(), V1: &sharing.V1Frame{Type: sharing.V1Frame_CANCEL.Enum()}}); err != nil {
+		t.Fatal(err)
+	}
+	c.SetReadDeadline(time.Now().Add(4 * time.Second))
+	if _, err := readFrame(c); err != io.EOF {
+		t.Fatalf("expected immediate disconnect after cancellation, got %v", err)
+	}
 }
 
 func TestDeviceMulticastDiscovery(t *testing.T) {
@@ -202,12 +256,13 @@ func TestDeviceFileTransfer(t *testing.T) {
 				t.Fatal(err)
 			}
 			defer c.Close()
-			c.SetDeadline(time.Now().Add(30 * time.Second))
+			c.SetDeadline(time.Now().Add(90 * time.Second))
 			request := &connections.OfflineFrame{Version: connections.OfflineFrame_V1.Enum(), V1: &connections.V1Frame{Type: connections.V1Frame_CONNECTION_REQUEST.Enum(), ConnectionRequest: &connections.ConnectionRequestFrame{EndpointId: proto.String("TEST"), EndpointName: proto.String("PC verifica")}}}
 			if err := writeFrame(c, marshalSmoke(t, request)); err != nil {
 				t.Fatal(err)
 			}
 			keys := smokeClientKeys(t, c)
+			t.Logf("Connection verification code: %s", verificationPIN(keys.authString))
 			if err := sendConnectionResponse(c); err != nil {
 				t.Fatal(err)
 			}
