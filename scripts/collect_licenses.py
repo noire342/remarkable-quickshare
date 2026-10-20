@@ -32,7 +32,9 @@ def main():
     args = parser.parse_args()
     def go(*command):
         return subprocess.check_output([args.go, *command], cwd=ROOT/'kindshare', text=True, encoding='utf-8')
-    subprocess.run([args.go, 'mod', 'download'], cwd=ROOT/'kindshare', check=True)
+    # Include graph-only/test dependencies too: a warm development cache can
+    # otherwise hide absent module archives on a clean CI runner.
+    subprocess.run([args.go, 'mod', 'download', 'all'], cwd=ROOT/'kindshare', check=True)
     modules = list(objects(go('list', '-m', '-json', 'all')))
     files = {}
     manifest = []
@@ -43,8 +45,8 @@ def main():
         license_id = 'BSD-3-Clause' if name.startswith('golang.org/x/') else LICENSE_IDS.get(name)
         if not license_id:
             raise SystemExit('Unreviewed dependency license: '+name)
-        directory = Path(module.get('Dir', ''))
-        if not directory.is_dir():
+        directory = Path(module['Dir']) if module.get('Dir') else None
+        if directory is None or not directory.is_dir():
             raise SystemExit('Dependency is not present: '+name)
         notices = [p for p in directory.iterdir() if p.is_file() and (p.name.upper().startswith(('LICENSE','COPYING','NOTICE')) or p.name.upper()=='PATENTS')]
         if not any(p.name.upper().startswith(('LICENSE','COPYING')) for p in notices):

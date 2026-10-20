@@ -18,9 +18,12 @@ Development checks completed on **20 October 2026**:
 
 - Go tests and vet pass, including Google PIN vectors, encrypted approval flows,
   early-content rejection, cancellation, expiry and concurrent encrypted writes.
-- Thirty Python tests pass: twenty-four installer/transport cases, four release
-  verification cases and two QMLDiff parser/patch cases. The latter use original
+- Thirty-one Python tests pass: twenty-four installer/transport cases, four release
+  verification cases, one license-cache regression and two QMLDiff parser/patch cases. The latter use original
   synthetic fixtures; no Xochitl resources are distributed with the tests.
+- License collection was additionally checked with a fresh Go module cache. It
+  downloads the complete graph and refuses missing module directories; it never
+  substitutes the project's MIT license for an unavailable dependency notice.
 - The pinned QMLDiff parser also applied the patch offline to private resources
   from the exact supported firmware. Windows PowerShell 5.1 preserved the verified
   dependency/bundle transport and exact remote command through a fake SSH client.
